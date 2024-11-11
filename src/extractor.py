@@ -40,9 +40,36 @@ class FeatureExtractor:
 
         return claim_count if claim_count > 0 else -3
 
+
+    def calculate_disb_bank_loan_wo_tbc(self, contracts: List[Dict]) -> float:
+        if not contracts:
+            return -3
+
+        excluded_banks = ['LIZ', 'LOM', 'MKO', 'SUG']
+        total_summa = 0
+        has_loans = False
+
+        for contract in contracts:
+            # Check if it's a valid bank loan (not in excluded banks)
+            if (contract.get('bank') and 
+                contract['bank'] not in excluded_banks and 
+                contract.get('contract_date') and 
+                contract['contract_date'] != '""'):
+                
+                # Get loan_summa if available
+                if contract.get('loan_summa') and contract['loan_summa'] != '""':
+                    try:
+                        summa = float(contract['loan_summa'])
+                        total_summa += summa
+                        has_loans = True
+                    except (ValueError, TypeError):
+                        continue
+
+        if not has_loans:
+            return -3
+        return total_summa if total_summa > 0 else -3
             
     def calculate_basic_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
-        """Calculate basic metrics from contracts"""
         metrics = {
             'total_contracts': len(contracts),
             'unique_banks': 0,
