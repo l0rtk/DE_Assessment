@@ -110,3 +110,4 @@ class FeatureExtractor:
         for _, row in self.df.iterrows():
             features = self.extract_features(row)
             features_list.append(features)
+        self.features_df = pd.DataFrame(features_list)
