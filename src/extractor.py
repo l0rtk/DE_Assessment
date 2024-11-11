@@ -1,6 +1,8 @@
 from typing import Dict,List
 import pandas as pd
 import json
+from .utils import parse_date
+from datetime import datetime
 
 class FeatureExtractor:
     def __init__(self, input_file: str):
@@ -28,3 +30,31 @@ class FeatureExtractor:
             'loan_amount_sum': sum(float(c['loan_summa']) for c in contracts if c.get('loan_summa') and c['loan_summa'] != '""')
         }
         
+    def calculate_temp_metrics(self, contracts: List[Dict]) -> Dict[str, float]:
+        dates = []
+        for contract in contracts:
+            if contract.get('claim_date'):
+                try:
+                    date = parse_date(contract['claim_date'])
+                    dates.append(date)
+                except ValueError:
+                    continue
+                    
+        if not dates:
+            return {
+                'days_since_first_contract': 0,
+                'days_since_last_contract': 0,
+                'contract_frequency': 0,
+                'active_months': 0
+            }
+            
+        first_date = min(dates)
+        last_date = max(dates)
+        unique_months = len(set((d.year, d.month) for d in dates))
+        
+        return {
+            'days_since_first_contract': (datetime.now() - first_date).days,
+            'days_since_last_contract': (datetime.now() - last_date).days,
+            'contract_frequency': (last_date - first_date).days / len(dates) if len(dates) > 1 else 0,
+            'active_months': unique_months
+        }
