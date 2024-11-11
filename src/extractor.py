@@ -154,10 +154,6 @@ class FeatureExtractor:
         if self.df is None:
             self.load_data()
             
-        from pprint import pprint
-        # print('-'*50)
-        # pprint(self.df)
-        # print('-'*50)
         features_list = []
         for _, row in self.df.iterrows():
             features = self.extract_features(row)
