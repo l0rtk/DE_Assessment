@@ -1,9 +1,6 @@
-from typing import Dict,List, Any
+from typing import Dict, List, Any
 import pandas as pd
 import json
-from .utils import parse_date
-from datetime import datetime
-from .utils import calculate_shannon_diversity
 import numpy as np
 
 class FeatureExtractor:
@@ -24,71 +21,121 @@ class FeatureExtractor:
         except json.JSONDecodeError:
             return []
             
-    def calculate_basic_metrics(self, contracts: List[Dict]) -> Dict[str, float]:
-        return {
+    def calculate_basic_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
+        """Calculate basic metrics from contracts"""
+        metrics = {
             'total_contracts': len(contracts),
-            'unique_banks': len({c['bank'] for c in contracts if c.get('bank')}),
-            'contract_value_sum': sum(float(c['summa']) for c in contracts if c.get('summa') and c['summa'] != '""'),
-            'loan_amount_sum': sum(float(c['loan_summa']) for c in contracts if c.get('loan_summa') and c['loan_summa'] != '""')
+            'unique_banks': 0,
+            'filled_contracts': 0,
+            'empty_contracts': 0, 
+            'total_summa': 0,
+            'total_loan_summa': 0,
+            'count_with_summa': 0,
+            'count_with_loan': 0
         }
         
-    def calculate_temp_metrics(self, contracts: List[Dict]) -> Dict[str, float]:
+        bank_set = set()
+        
+        for contract in contracts:
+            if any(contract.get(field) and contract[field] != '""' 
+                  for field in ['contract_id', 'summa', 'loan_summa']):
+                metrics['filled_contracts'] += 1
+            else:
+                metrics['empty_contracts'] += 1
+            
+            if contract.get('bank') and contract['bank'] != '""':
+                bank_set.add(contract['bank'])
+            
+            if contract.get('summa') and contract['summa'] != '""':
+                try:
+                    summa = float(contract['summa'])
+                    metrics['total_summa'] += summa
+                    metrics['count_with_summa'] += 1
+                except (ValueError, TypeError):
+                    pass
+            
+            if contract.get('loan_summa') and contract['loan_summa'] != '""':
+                try:
+                    loan = float(contract['loan_summa'])
+                    metrics['total_loan_summa'] += loan
+                    metrics['count_with_loan'] += 1
+                except (ValueError, TypeError):
+                    pass
+        
+        metrics['unique_banks'] = len(bank_set)
+        
+        metrics['avg_summa'] = (metrics['total_summa'] / metrics['count_with_summa'] 
+                              if metrics['count_with_summa'] > 0 else 0)
+        metrics['avg_loan_summa'] = (metrics['total_loan_summa'] / metrics['count_with_loan']
+                                   if metrics['count_with_loan'] > 0 else 0)
+        
+        return metrics
+    
+    def calculate_temporal_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
+        """Calculate time-based metrics from contracts"""
+        metrics = {
+            'unique_dates': 0,
+            'earliest_date': None,
+            'latest_date': None,
+            'date_range_days': 0,
+            'unique_months': 0
+        }
+        
         dates = []
         for contract in contracts:
             if contract.get('claim_date'):
                 try:
-                    date = parse_date(contract['claim_date'])
+                    date = pd.to_datetime(contract['claim_date'], format='%d.%m.%Y')
                     dates.append(date)
                 except ValueError:
                     continue
-                    
-        if not dates:
-            return {
-                'days_since_first_contract': 0,
-                'days_since_last_contract': 0,
-                'contract_frequency': 0,
-                'active_months': 0
-            }
-            
-        first_date = min(dates)
-        last_date = max(dates)
-        unique_months = len(set((d.year, d.month) for d in dates))
         
-        return {
-            'days_since_first_contract': (datetime.now() - first_date).days,
-            'days_since_last_contract': (datetime.now() - last_date).days,
-            'contract_frequency': (last_date - first_date).days / len(dates) if len(dates) > 1 else 0,
-            'active_months': unique_months
-        }
-
-    def calculate_advanced_metrics(self, contracts: List[Dict]) -> Dict[str, float]:
-        # Bank diversity
-        bank_counts = {}
-        for contract in contracts:
-            bank = contract.get('bank', '')
-            bank_counts[bank] = bank_counts.get(bank, 0) + 1
-            
-        # Contract values by bank
-        bank_values = {}
-        for contract in contracts:
-            if contract.get('summa') and contract['summa'] != '""':
-                bank = contract.get('bank', '')
-                value = float(contract['summa'])
-                if bank in bank_values:
-                    bank_values[bank].append(value)
-                else:
-                    bank_values[bank] = [value]
-                    
-        # Calculate metrics
-        metrics = {
-            'bank_diversity': calculate_shannon_diversity(list(bank_counts.values())) if bank_counts else 0,
-            'completed_ratio': len([c for c in contracts if c.get('contract_id') and c.get('contract_date')]) / len(contracts) if contracts else 0,
-            'value_per_bank': np.mean([np.mean(values) for values in bank_values.values()]) if bank_values else 0,
-            'max_single_value': max([float(c['summa']) for c in contracts if c.get('summa') and c['summa'] != '""'], default=0)
-        }
+        if dates:
+            metrics['unique_dates'] = len(set(dates))
+            metrics['earliest_date'] = min(dates)
+            metrics['latest_date'] = max(dates)
+            metrics['date_range_days'] = (metrics['latest_date'] - metrics['earliest_date']).days
+            metrics['unique_months'] = len(set((d.year, d.month) for d in dates))
         
         return metrics
-
+    
+    def calculate_bank_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
+        """Calculate bank-related metrics"""
+        metrics = {
+            'bank_contract_counts': {},  
+            'bank_total_summa': {},      
+            'bank_total_loans': {}       
+        }
+        
+        for contract in contracts:
+            bank = contract.get('bank', '')
+            if bank and bank != '""':
+                metrics['bank_contract_counts'][bank] = metrics['bank_contract_counts'].get(bank, 0) + 1
+                
+                if contract.get('summa') and contract['summa'] != '""':
+                    try:
+                        summa = float(contract['summa'])
+                        metrics['bank_total_summa'][bank] = metrics['bank_total_summa'].get(bank, 0) + summa
+                    except (ValueError, TypeError):
+                        pass
+                        
+                if contract.get('loan_summa') and contract['loan_summa'] != '""':
+                    try:
+                        loan = float(contract['loan_summa'])
+                        metrics['bank_total_loans'][bank] = metrics['bank_total_loans'].get(bank, 0) + loan
+                    except (ValueError, TypeError):
+                        pass
+        
+        if metrics['bank_contract_counts']:
+            metrics['max_contracts_per_bank'] = max(metrics['bank_contract_counts'].values())
+            metrics['min_contracts_per_bank'] = min(metrics['bank_contract_counts'].values())
+            metrics['avg_contracts_per_bank'] = np.mean(list(metrics['bank_contract_counts'].values()))
+        else:
+            metrics['max_contracts_per_bank'] = 0
+            metrics['min_contracts_per_bank'] = 0
+            metrics['avg_contracts_per_bank'] = 0
+            
+        return metrics
 
     def extract_features(self, row: pd.Series) -> Dict[str, Any]:
         contracts = self.parse_contracts(row['contracts'])
@@ -96,8 +143,8 @@ class FeatureExtractor:
         features = {
             'id': row['id'],
             **self.calculate_basic_metrics(contracts),
-            **self.calculate_temp_metrics(contracts),
-            **self.calculate_advanced_metrics(contracts)
+            **self.calculate_temporal_metrics(contracts),
+            **self.calculate_bank_metrics(contracts)
         }
         
         return features
@@ -111,7 +158,7 @@ class FeatureExtractor:
             features = self.extract_features(row)
             features_list.append(features)
         self.features_df = pd.DataFrame(features_list)
-
+        
     def save_features(self, output_file: str = 'contract_features.csv') -> None:
         if self.features_df is None:
             raise ValueError("No features to save. Run process_data() first.")
