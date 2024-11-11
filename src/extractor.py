@@ -11,10 +11,11 @@ class FeatureExtractor:
         
     def load_data(self) -> None:
         self.df = pd.read_csv(self.input_file)
-        # self.df['application_date'] = pd.to_datetime(self.df['application_date'])
+        # Convert application_date to timezone-aware datetime
         self.df['application_date'] = pd.to_datetime(self.df['application_date'], format='ISO8601')
+        # Convert to UTC and remove timezone for consistent comparison
+        self.df['application_date'] = self.df['application_date'].dt.tz_localize(None)
 
-        
     def parse_contracts(self, contracts_json: str) -> List[Dict]:
         if pd.isna(contracts_json) or not contracts_json:
             return []
@@ -31,6 +32,7 @@ class FeatureExtractor:
         for contract in contracts:
             if contract.get('claim_date'):
                 try:
+                    # parse claim date without timezone
                     claim_date = pd.to_datetime(contract['claim_date'], format='%d.%m.%Y')
                     days_diff = (application_date - claim_date).days
                     if 0 <= days_diff <= 180:
@@ -39,7 +41,6 @@ class FeatureExtractor:
                     continue
 
         return claim_count if claim_count > 0 else -3
-
 
     def calculate_disb_bank_loan_wo_tbc(self, contracts: List[Dict]) -> float:
         if not contracts:
@@ -50,13 +51,11 @@ class FeatureExtractor:
         has_loans = False
 
         for contract in contracts:
-            # Check if it's a valid bank loan (not in excluded banks)
             if (contract.get('bank') and 
                 contract['bank'] not in excluded_banks and 
                 contract.get('contract_date') and 
                 contract['contract_date'] != '""'):
                 
-                # Get loan_summa if available
                 if contract.get('loan_summa') and contract['loan_summa'] != '""':
                     try:
                         summa = float(contract['loan_summa'])
@@ -79,6 +78,7 @@ class FeatureExtractor:
         for contract in contracts:
             if contract.get('contract_date') and contract.get('summa') and contract['summa'] != '""':
                 try:
+                    # Parse contract date without timezone
                     contract_date = pd.to_datetime(contract['contract_date'], format='%d.%m.%Y')
                     if latest_loan_date is None or contract_date > latest_loan_date:
                         latest_loan_date = contract_date
@@ -93,7 +93,6 @@ class FeatureExtractor:
             days_since = (application_date - latest_loan_date).days
             return days_since
         return -3
-            
 
     def extract_features(self, row: pd.Series) -> Dict[str, Any]:
         contracts = self.parse_contracts(row['contracts'])
@@ -106,19 +105,26 @@ class FeatureExtractor:
         }
         
         return features
-
         
     def process_data(self) -> None:
         if self.df is None:
             self.load_data()
             
         features_list = []
-        for _, row in self.df.iterrows():
+        total_rows = len(self.df)
+        
+        for idx, row in self.df.iterrows():
             features = self.extract_features(row)
             features_list.append(features)
+            
+            if (idx + 1) % 100 == 0:
+                print(f"Processed {idx + 1}/{total_rows} rows")
+                
         self.features_df = pd.DataFrame(features_list)
+        print(f"Completed processing {total_rows} rows")
         
     def save_features(self, output_file: str = 'contract_features.csv') -> None:
         if self.features_df is None:
             raise ValueError("No features to save. Run process_data() first.")
         self.features_df.to_csv(output_file, index=False)
+        print(f"Saved features to {output_file}")
