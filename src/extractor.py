@@ -58,3 +58,31 @@ class FeatureExtractor:
             'contract_frequency': (last_date - first_date).days / len(dates) if len(dates) > 1 else 0,
             'active_months': unique_months
         }
+
+    def calculate_advanced_metrics(self, contracts: List[Dict]) -> Dict[str, float]:
+        # Bank diversity
+        bank_counts = {}
+        for contract in contracts:
+            bank = contract.get('bank', '')
+            bank_counts[bank] = bank_counts.get(bank, 0) + 1
+            
+        # Contract values by bank
+        bank_values = {}
+        for contract in contracts:
+            if contract.get('summa') and contract['summa'] != '""':
+                bank = contract.get('bank', '')
+                value = float(contract['summa'])
+                if bank in bank_values:
+                    bank_values[bank].append(value)
+                else:
+                    bank_values[bank] = [value]
+                    
+        # Calculate metrics
+        metrics = {
+            'bank_diversity': calculate_shannon_diversity(list(bank_counts.values())) if bank_counts else 0,
+            'completed_ratio': len([c for c in contracts if c.get('contract_id') and c.get('contract_date')]) / len(contracts) if contracts else 0,
+            'value_per_bank': np.mean([np.mean(values) for values in bank_values.values()]) if bank_values else 0,
+            'max_single_value': max([float(c['summa']) for c in contracts if c.get('summa') and c['summa'] != '""'], default=0)
+        }
+        
+        return metrics
