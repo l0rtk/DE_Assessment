@@ -95,8 +95,8 @@ class FeatureExtractor:
         return -3
             
 
-    def extract_features(self, row: pd.TimeSeries) -> Dict[str, Any]:
-        contracts = self.parse(row['contracts'])
+    def extract_features(self, row: pd.Series) -> Dict[str, Any]:
+        contracts = self.parse_contracts(row['contracts'])
         
         features = {
             'id': row['id'],
