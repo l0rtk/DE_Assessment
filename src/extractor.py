@@ -11,7 +11,9 @@ class FeatureExtractor:
         
     def load_data(self) -> None:
         self.df = pd.read_csv(self.input_file)
-        self.df['application_date'] = pd.to_datetime(self.df['application_date'])
+        # self.df['application_date'] = pd.to_datetime(self.df['application_date'])
+        self.df['application_date'] = pd.to_datetime(self.df['application_date'], format='ISO8601')
+
         
     def parse_contracts(self, contracts_json: str) -> List[Dict]:
         if pd.isna(contracts_json) or not contracts_json:
@@ -73,7 +75,6 @@ class FeatureExtractor:
         return metrics
     
     def calculate_temporal_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
-        """Calculate time-based metrics from contracts"""
         metrics = {
             'unique_dates': 0,
             'earliest_date': None,
@@ -84,12 +85,13 @@ class FeatureExtractor:
         
         dates = []
         for contract in contracts:
-            if contract.get('claim_date'):
-                try:
-                    date = pd.to_datetime(contract['claim_date'], format='%d.%m.%Y')
-                    dates.append(date)
-                except ValueError:
-                    continue
+            if type(contract) == dict:
+                if contract.get('claim_date'):
+                    try:
+                        date = pd.to_datetime(contract['claim_date'], format='%d.%m.%Y')
+                        dates.append(date)
+                    except ValueError:
+                        continue
         
         if dates:
             metrics['unique_dates'] = len(set(dates))
@@ -101,7 +103,6 @@ class FeatureExtractor:
         return metrics
     
     def calculate_bank_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
-        """Calculate bank-related metrics"""
         metrics = {
             'bank_contract_counts': {},  
             'bank_total_summa': {},      
@@ -109,23 +110,24 @@ class FeatureExtractor:
         }
         
         for contract in contracts:
-            bank = contract.get('bank', '')
-            if bank and bank != '""':
-                metrics['bank_contract_counts'][bank] = metrics['bank_contract_counts'].get(bank, 0) + 1
-                
-                if contract.get('summa') and contract['summa'] != '""':
-                    try:
-                        summa = float(contract['summa'])
-                        metrics['bank_total_summa'][bank] = metrics['bank_total_summa'].get(bank, 0) + summa
-                    except (ValueError, TypeError):
-                        pass
-                        
-                if contract.get('loan_summa') and contract['loan_summa'] != '""':
-                    try:
-                        loan = float(contract['loan_summa'])
-                        metrics['bank_total_loans'][bank] = metrics['bank_total_loans'].get(bank, 0) + loan
-                    except (ValueError, TypeError):
-                        pass
+            if type(contract) == dict:
+                bank = contract.get('bank', '')
+                if bank and bank != '""':
+                    metrics['bank_contract_counts'][bank] = metrics['bank_contract_counts'].get(bank, 0) + 1
+                    
+                    if contract.get('summa') and contract['summa'] != '""':
+                        try:
+                            summa = float(contract['summa'])
+                            metrics['bank_total_summa'][bank] = metrics['bank_total_summa'].get(bank, 0) + summa
+                        except (ValueError, TypeError):
+                            pass
+                            
+                    if contract.get('loan_summa') and contract['loan_summa'] != '""':
+                        try:
+                            loan = float(contract['loan_summa'])
+                            metrics['bank_total_loans'][bank] = metrics['bank_total_loans'].get(bank, 0) + loan
+                        except (ValueError, TypeError):
+                            pass
         
         if metrics['bank_contract_counts']:
             metrics['max_contracts_per_bank'] = max(metrics['bank_contract_counts'].values())
