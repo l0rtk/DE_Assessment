@@ -37,30 +37,31 @@ class FeatureExtractor:
         bank_set = set()
         
         for contract in contracts:
-            if any(contract.get(field) and contract[field] != '""' 
-                  for field in ['contract_id', 'summa', 'loan_summa']):
-                metrics['filled_contracts'] += 1
-            else:
-                metrics['empty_contracts'] += 1
-            
-            if contract.get('bank') and contract['bank'] != '""':
-                bank_set.add(contract['bank'])
-            
-            if contract.get('summa') and contract['summa'] != '""':
-                try:
-                    summa = float(contract['summa'])
-                    metrics['total_summa'] += summa
-                    metrics['count_with_summa'] += 1
-                except (ValueError, TypeError):
-                    pass
-            
-            if contract.get('loan_summa') and contract['loan_summa'] != '""':
-                try:
-                    loan = float(contract['loan_summa'])
-                    metrics['total_loan_summa'] += loan
-                    metrics['count_with_loan'] += 1
-                except (ValueError, TypeError):
-                    pass
+            if type(contract) == dict:
+                if any(contract.get(field) and contract[field] != '""' 
+                    for field in ['contract_id', 'summa', 'loan_summa']):
+                    metrics['filled_contracts'] += 1
+                else:
+                    metrics['empty_contracts'] += 1
+                
+                if contract.get('bank') and contract['bank'] != '""':
+                    bank_set.add(contract['bank'])
+                
+                if contract.get('summa') and contract['summa'] != '""':
+                    try:
+                        summa = float(contract['summa'])
+                        metrics['total_summa'] += summa
+                        metrics['count_with_summa'] += 1
+                    except (ValueError, TypeError):
+                        pass
+                
+                if contract.get('loan_summa') and contract['loan_summa'] != '""':
+                    try:
+                        loan = float(contract['loan_summa'])
+                        metrics['total_loan_summa'] += loan
+                        metrics['count_with_loan'] += 1
+                    except (ValueError, TypeError):
+                        pass
         
         metrics['unique_banks'] = len(bank_set)
         
@@ -153,6 +154,10 @@ class FeatureExtractor:
         if self.df is None:
             self.load_data()
             
+        from pprint import pprint
+        # print('-'*50)
+        # pprint(self.df)
+        # print('-'*50)
         features_list = []
         for _, row in self.df.iterrows():
             features = self.extract_features(row)
