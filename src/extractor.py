@@ -68,6 +68,31 @@ class FeatureExtractor:
         if not has_loans:
             return -3
         return total_summa if total_summa > 0 else -3
+
+    def calculate_day_sinlastloan(self, contracts: List[Dict], application_date: pd.Timestamp) -> int:
+        if not contracts:
+            return -3
+
+        latest_loan_date = None
+        has_loans = False
+
+        for contract in contracts:
+            if contract.get('contract_date') and contract.get('summa') and contract['summa'] != '""':
+                try:
+                    contract_date = pd.to_datetime(contract['contract_date'], format='%d.%m.%Y')
+                    if latest_loan_date is None or contract_date > latest_loan_date:
+                        latest_loan_date = contract_date
+                        has_loans = True
+                except ValueError:
+                    continue
+
+        if not has_loans:
+            return -3
+
+        if latest_loan_date:
+            days_since = (application_date - latest_loan_date).days
+            return days_since
+        return -3
             
     def calculate_basic_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
         metrics = {
