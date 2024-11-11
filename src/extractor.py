@@ -1,4 +1,4 @@
-from typing import Dict,List
+from typing import Dict,List, Any
 import pandas as pd
 import json
 from .utils import parse_date
@@ -90,7 +90,7 @@ class FeatureExtractor:
         return metrics
 
 
-    def extract_features(self, row: pd.Series) -> Dict[str]:
+    def extract_features(self, row: pd.Series) -> Dict[str, Any]:
         contracts = self.parse_contracts(row['contracts'])
         
         features = {
