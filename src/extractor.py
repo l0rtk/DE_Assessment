@@ -111,3 +111,8 @@ class FeatureExtractor:
             features = self.extract_features(row)
             features_list.append(features)
         self.features_df = pd.DataFrame(features_list)
+
+    def save_features(self, output_file: str = 'contract_features.csv') -> None:
+        if self.features_df is None:
+            raise ValueError("No features to save. Run process_data() first.")
+        self.features_df.to_csv(output_file, index=False)
