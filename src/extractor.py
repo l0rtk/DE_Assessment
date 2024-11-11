@@ -22,6 +22,24 @@ class FeatureExtractor:
             return json.loads(contracts_json)
         except json.JSONDecodeError:
             return []
+
+    def calculate_tot_claim_cnt_l180d(self, contracts: List[Dict], application_date: pd.Timestamp) -> int:
+        if not contracts:
+            return -3
+
+        claim_count = 0
+        for contract in contracts:
+            if contract.get('claim_date'):
+                try:
+                    claim_date = pd.to_datetime(contract['claim_date'], format='%d.%m.%Y')
+                    days_diff = (application_date - claim_date).days
+                    if 0 <= days_diff <= 180:
+                        claim_count += 1
+                except ValueError:
+                    continue
+
+        return claim_count if claim_count > 0 else -3
+
             
     def calculate_basic_metrics(self, contracts: List[Dict]) -> Dict[str, Any]:
         """Calculate basic metrics from contracts"""
