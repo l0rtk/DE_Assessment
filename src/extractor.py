@@ -3,6 +3,8 @@ import pandas as pd
 import json
 from .utils import parse_date
 from datetime import datetime
+from .utils import calculate_shannon_diversity
+import numpy as np
 
 class FeatureExtractor:
     def __init__(self, input_file: str):
@@ -86,3 +88,25 @@ class FeatureExtractor:
         }
         
         return metrics
+
+
+    def extract_features(self, row: pd.Series) -> Dict[str]:
+        contracts = self.parse_contracts(row['contracts'])
+        
+        features = {
+            'id': row['id'],
+            **self.calculate_basic_metrics(contracts),
+            **self.calculate_temp_metrics(contracts),
+            **self.calculate_advanced_metrics(contracts)
+        }
+        
+        return features
+        
+    def process_data(self) -> None:
+        if self.df is None:
+            self.load_data()
+            
+        features_list = []
+        for _, row in self.df.iterrows():
+            features = self.extract_features(row)
+            features_list.append(features)
